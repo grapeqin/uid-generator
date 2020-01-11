@@ -5,7 +5,6 @@
 			   type="com.baidu.fsg.uid.worker.entity.WorkerNodeEntity">
 		<id column="ID" jdbcType="BIGINT" property="id" />
 		<result column="HOST_NAME" jdbcType="VARCHAR" property="hostName" />
-		<result column="PORT" jdbcType="VARCHAR" property="port" />
 		<result column="TYPE" jdbcType="INTEGER" property="type" />
 		<result column="LAUNCH_DATE" jdbcType="DATE" property="launchDate" />
 		<result column="MODIFIED" jdbcType="TIMESTAMP" property="modified" />
@@ -16,14 +15,12 @@
 		parameterType="com.baidu.fsg.uid.worker.entity.WorkerNodeEntity">
 		INSERT INTO WORKER_NODE
 		(HOST_NAME,
-		PORT,
 		TYPE,
 		LAUNCH_DATE,
 		MODIFIED,
 		CREATED)
 		VALUES (
 		#{hostName},
-		#{port},
 		#{type},
 		#{launchDate},
 		NOW(),
@@ -34,7 +31,6 @@
 		SELECT
 		ID,
 		HOST_NAME,
-		PORT,
 		TYPE,
 		LAUNCH_DATE,
 		MODIFIED,
@@ -42,6 +38,6 @@
 		FROM
 		WORKER_NODE
 		WHERE
-		HOST_NAME = #{host} AND PORT = #{port}
+		HOST_NAME = #{host}
 	</select>
 </mapper>

@@ -15,65 +15,86 @@
  */
 package com.baidu.fsg.uid.worker;
 
+import javax.annotation.Resource;
+
 import com.baidu.fsg.uid.utils.DockerUtils;
 import com.baidu.fsg.uid.utils.NetUtils;
 import com.baidu.fsg.uid.worker.dao.WorkerNodeDAO;
 import com.baidu.fsg.uid.worker.entity.WorkerNodeEntity;
-import org.apache.commons.lang.math.RandomUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.transaction.annotation.Transactional;
-
-import javax.annotation.Resource;
 
 /**
- * Represents an implementation of {@link WorkerIdAssigner}, 
- * the worker id will be discarded after assigned to the UidGenerator
- * 
+ * Represents an implementation of {@link WorkerIdAssigner}, the worker id
+ * will be discarded after
+ * assigned to the UidGenerator
+ *
  * @author yutianbao
  */
 public class DisposableWorkerIdAssigner implements WorkerIdAssigner {
-    private static final Logger LOGGER = LoggerFactory.getLogger(DisposableWorkerIdAssigner.class);
+	private static final Logger LOGGER =
+			LoggerFactory.getLogger(DisposableWorkerIdAssigner.class);
 
-    @Resource
-    private WorkerNodeDAO workerNodeDAO;
+	@Resource
+	private WorkerNodeDAO workerNodeDAO;
 
-    /**
-     * Assign worker id base on database.<p>
-     * If there is host name & port in the environment, we considered that the node runs in Docker container<br>
-     * Otherwise, the node runs on an actual machine.
-     * 
-     * @return assigned worker id
-     */
-    @Transactional
-    public long assignWorkerId() {
-        // build worker node entity
-        WorkerNodeEntity workerNodeEntity = buildWorkerNode();
+	/**
+	 * Assign worker id base on database.
+	 *
+	 * <p>If there is host name in the environment, we considered that the
+	 * node runs in Docker
+	 * container<br>
+	 * Otherwise, the node runs on an actual machine.
+	 *
+	 * @return assigned worker id
+	 */
+	@Override
+	public synchronized long assignWorkerId() {
+		String host = getHost();
+		WorkerNodeEntity workerNodeEntity =
+				workerNodeDAO.getWorkerNodeByHostPort(host);
+		// build worker node entity
+		if (null == workerNodeEntity) {
+			workerNodeEntity = buildWorkerNode();
+			// add worker node for new (ignore the same IP + PORT)
+			workerNodeDAO.addWorkerNode(workerNodeEntity);
+			LOGGER.info("Add worker node:" + workerNodeEntity);
+		}
+		return workerNodeEntity.getId();
+	}
 
-        // add worker node for new (ignore the same IP + PORT)
-        workerNodeDAO.addWorkerNode(workerNodeEntity);
-        LOGGER.info("Add worker node:" + workerNodeEntity);
+	/**
+	 * 获取当前应用环境的主机地址
+	 *
+	 * @return
+	 */
+	private String getHost() {
+		if (DockerUtils.isDocker()) {
+			return DockerUtils.getDockerHost();
+		}
+		else {
+			return NetUtils.getLocalAddress();
+		}
+	}
 
-        return workerNodeEntity.getId();
-    }
+	/** Build worker node entity by IP and PORT */
+	private WorkerNodeEntity buildWorkerNode() {
+		WorkerNodeEntity workerNodeEntity = new WorkerNodeEntity();
+		if (DockerUtils.isDocker()) {
+			workerNodeEntity.setType(WorkerNodeType.CONTAINER.value());
+			workerNodeEntity.setHostName(DockerUtils.getDockerHost());
+			//            workerNodeEntity.setPort(DockerUtils.getDockerPort
+			//            ());
 
-    /**
-     * Build worker node entity by IP and PORT
-     */
-    private WorkerNodeEntity buildWorkerNode() {
-        WorkerNodeEntity workerNodeEntity = new WorkerNodeEntity();
-        if (DockerUtils.isDocker()) {
-            workerNodeEntity.setType(WorkerNodeType.CONTAINER.value());
-            workerNodeEntity.setHostName(DockerUtils.getDockerHost());
-            workerNodeEntity.setPort(DockerUtils.getDockerPort());
+		}
+		else {
+			workerNodeEntity.setType(WorkerNodeType.ACTUAL.value());
+			workerNodeEntity.setHostName(NetUtils.getLocalAddress());
+			//            workerNodeEntity.setPort(System.currentTimeMillis()
+			//            + "-" +
+			//            RandomUtils.nextInt(100000));
+		}
 
-        } else {
-            workerNodeEntity.setType(WorkerNodeType.ACTUAL.value());
-            workerNodeEntity.setHostName(NetUtils.getLocalAddress());
-            workerNodeEntity.setPort(System.currentTimeMillis() + "-" + RandomUtils.nextInt(100000));
-        }
-
-        return workerNodeEntity;
-    }
-
+		return workerNodeEntity;
+	}
 }

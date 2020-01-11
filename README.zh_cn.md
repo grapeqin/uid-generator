@@ -12,17 +12,20 @@ UidGenerator是Java实现的, 基于[Snowflake](https://github.com/twitter/snowf
 
 Snowflake算法
 -------------
-![Snowflake](doc/snowflake.png)  
+| sign  |  delta seconds   |  worker node id   |  sequence   |
+|:---:|:---:|:---:|:---:|
+|  1bit | 32bits    |  18bits   |  13bits   |
+
 Snowflake算法描述：指定机器 & 同一时刻 & 某一并发序列，是唯一的。据此可生成一个64 bits的唯一ID（long）。默认采用上图字节分配方式：
 
 * sign(1bit)  
   固定1bit符号标识，即生成的UID为正数。
 
-* delta seconds (28 bits)  
-  当前时间，相对于时间基点"2016-05-20"的增量值，单位：秒，最多可支持约8.7年
+* delta seconds (32 bits)  
+  当前时间，相对于时间基点"2020-01-01"的增量值，单位：秒，最多可支持约136年
 
-* worker id (22 bits)  
-  机器id，最多可支持约420w次机器启动。内置实现为在启动时由数据库分配，默认分配策略为用后即弃，后续可提供复用策略。
+* worker id (18 bits)  
+  机器id，最多可支持约26w台不同ip的机器部署。内置实现为在启动时由数据库分配，默认分配策略为根据ip复用workid
 
 * sequence (13 bits)   
   每秒下的并发序列，13 bits可支持每秒8192个并发。
@@ -91,12 +94,12 @@ CREATE TABLE WORKER_NODE
 (
 ID BIGINT NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
 HOST_NAME VARCHAR(64) NOT NULL COMMENT 'host name',
-PORT VARCHAR(64) NOT NULL COMMENT 'port',
 TYPE INT NOT NULL COMMENT 'node type: ACTUAL or CONTAINER',
 LAUNCH_DATE DATE NOT NULL COMMENT 'launch date',
 MODIFIED TIMESTAMP NOT NULL COMMENT 'modified time',
 CREATED TIMESTAMP NOT NULL COMMENT 'created time',
-PRIMARY KEY(ID)
+PRIMARY KEY(ID),
+UNIQUE KEY (HOST_NAME)
 )
  COMMENT='DB WorkerID Assigner for UID Generator',ENGINE = INNODB;
 ```
@@ -114,10 +117,10 @@ PRIMARY KEY(ID)
     <property name="workerIdAssigner" ref="disposableWorkerIdAssigner"/>
 
     <!-- Specified bits & epoch as your demand. No specified the default value will be used -->
-    <property name="timeBits" value="29"/>
-    <property name="workerBits" value="21"/>
+    <property name="timeBits" value="32"/>
+    <property name="workerBits" value="18"/>
     <property name="seqBits" value="13"/>
-    <property name="epochStr" value="2016-09-20"/>
+    <property name="epochStr" value="2020-01-01"/>
 </bean>
  
 <!-- 用完即弃的WorkerIdAssigner，依赖DB操作 -->
@@ -133,10 +136,10 @@ PRIMARY KEY(ID)
  
     <!-- 以下为可选配置, 如未指定将采用默认值 -->
     <!-- Specified bits & epoch as your demand. No specified the default value will be used -->
-    <property name="timeBits" value="29"/>
-    <property name="workerBits" value="21"/>
+    <property name="timeBits" value="32"/>
+    <property name="workerBits" value="18"/>
     <property name="seqBits" value="13"/>
-    <property name="epochStr" value="2016-09-20"/>
+    <property name="epochStr" value="2020-01-01"/>
  
     <!-- RingBuffer size扩容参数, 可提高UID生成的吞吐量. -->
     <!-- 默认:3， 原bufferSize=8192, 扩容后bufferSize= 8192 << 3 = 65536 -->
@@ -248,31 +251,3 @@ public void testSerialGenerate() {
 
 对于节点重启频率频繁、期望长期使用的应用, 可增加```workerBits```和```timeBits```位数, 减少```seqBits```位数. 例如节点采取用完即弃的WorkerIdAssigner策略, 重启频率为24*12次/天,
 那么配置成```{"workerBits":27,"timeBits":30,"seqBits":6}```时, 可支持37个节点以整体并发量2400 UID/s的速度持续运行34年.
-
-#### 吞吐量测试
-在MacBook Pro（2.7GHz Intel Core i5, 8G DDR3）上进行了CachedUidGenerator（单实例）的UID吞吐量测试. <br/>
-首先固定住workerBits为任选一个值(如20), 分别统计timeBits变化时(如从25至32, 总时长分别对应1年和136年)的吞吐量, 如下表所示:<br/>
-
-|timeBits|25|26|27|28|29|30|31|32|
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|throughput|6,831,465|7,007,279|6,679,625|6,499,205|6,534,971|7,617,440|6,186,930|6,364,997|
-
-![throughput1](doc/throughput1.png)
-
-再固定住timeBits为任选一个值(如31), 分别统计workerBits变化时(如从20至29, 总重启次数分别对应1百万和500百万)的吞吐量, 如下表所示:<br/>
-
-|workerBits|20|21|22|23|24|25|26|27|28|29|
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|throughput|6,186,930|6,642,727|6,581,661|6,462,726|6,774,609|6,414,906|6,806,266|6,223,617|6,438,055|6,435,549|
-
-![throughput1](doc/throughput2.png)
-
-由此可见, 不管如何配置, CachedUidGenerator总能提供**600万/s**的稳定吞吐量, 只是使用年限会有所减少. 这真的是太棒了.
-
-最后, 固定住workerBits和timeBits位数(如23和31), 分别统计不同数目(如1至8,本机CPU核数为4)的UID使用者情况下的吞吐量,<br/>
-
-|workerBits|1|2|3|4|5|6|7|8|
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|throughput|6,462,726|6,542,259|6,077,717|6,377,958|7,002,410|6,599,113|7,360,934|6,490,969|
-
-![throughput1](doc/throughput3.png)

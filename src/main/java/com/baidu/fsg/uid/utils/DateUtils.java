@@ -18,7 +18,6 @@ package com.baidu.fsg.uid.utils;
 import java.text.ParseException;
 import java.util.Calendar;
 import java.util.Date;
-
 import org.apache.commons.lang.time.DateFormatUtils;
 
 /**
@@ -64,7 +63,7 @@ public abstract class DateUtils extends org.apache.commons.lang.time.DateUtils {
      * @return
      * @throws RuntimeException when ParseException occurred
      */
-    public static Date parseDate(String str, String pattern) {
+	public static Date parseDate(String str, String pattern) {
         try {
             return parseDate(str, new String[]{pattern});
         } catch (ParseException e) {

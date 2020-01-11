@@ -15,12 +15,10 @@
  */
 package com.baidu.fsg.uid.worker.entity;
 
+import com.baidu.fsg.uid.worker.WorkerNodeType;
 import java.util.Date;
-
 import org.apache.commons.lang.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang.builder.ToStringStyle;
-
-import com.baidu.fsg.uid.worker.WorkerNodeType;
 
 /**
  * Entity for M_WORKER_NODE
@@ -39,12 +37,7 @@ public class WorkerNodeEntity {
      */
     private String hostName;
 
-    /**
-     * Type of CONTAINER: Port, ACTUAL : Timestamp + Random(0-10000)
-     */
-    private String port;
-
-    /**
+	/**
      * type of {@link WorkerNodeType}
      */
     private int type;
@@ -81,14 +74,6 @@ public class WorkerNodeEntity {
 
     public void setHostName(String hostName) {
         this.hostName = hostName;
-    }
-
-    public String getPort() {
-        return port;
-    }
-
-    public void setPort(String port) {
-        this.port = port;
     }
 
     public int getType() {

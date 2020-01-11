@@ -22,7 +22,7 @@ it is a 64 bits number(long), and the default bits of that three fields are as f
   The highest bit is always 0.
 
 * delta seconds (28 bits)  
-  The next 28 bits, represents delta seconds since a customer epoch(2016-05-20). The maximum time will be 8.7 years.
+  The next 28 bits, represents delta seconds since a customer epoch(2020-01-01). The maximum time will be 8.7 years.
 
 * worker id (22 bits)  
   The next 22 bits, represents the worker node id, maximum value will be 4.2 million. UidGenerator uses a build-in
